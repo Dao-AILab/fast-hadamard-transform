@@ -85,13 +85,13 @@ def append_nvcc_threads(nvcc_extra_args):
     return nvcc_extra_args + ["--threads", "4"]
 
 
+cmdclass = {}
+ext_modules = []
+
 if not SKIP_CUDA_BUILD:
     print("\n\ntorch.__version__  = {}\n\n".format(torch.__version__))
     TORCH_MAJOR = int(torch.__version__.split(".")[0])
     TORCH_MINOR = int(torch.__version__.split(".")[1])
-
-    cmdclass = {}
-    ext_modules = []
 
     check_if_cuda_home_none("fast_hadamard_transform")
     # Check, if CUDA11 is installed for compute capability 8.0
