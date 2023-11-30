@@ -28,10 +28,17 @@
 template<typename input_t>
 void fast_hadamard_transform_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
+template<typename input_t>
+void fast_hadamard_transform_20N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+
+template<typename input_t>
+void fast_hadamard_transform_28N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+
 void set_hadamard_params(HadamardParamsBase &params,
                          // sizes
                          const size_t batch,
                          const size_t dim,
+                         const size_t multiple,
                          // device pointers
                          const at::Tensor x,
                          const at::Tensor out,
@@ -43,7 +50,7 @@ void set_hadamard_params(HadamardParamsBase &params,
 
     params.batch = batch;
     params.dim = dim;
-    params.log_dim = int(ceil(std::log2(dim)));
+    params.log_N = int(ceil(std::log2(dim / multiple)));
 
     // Set the pointers and strides.
     params.x_ptr = x.data_ptr();
@@ -84,7 +91,7 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
     at::Tensor out = torch::empty_like(x);
 
     HadamardParamsBase params;
-    set_hadamard_params(params, batch_size, dim, x, out, scale);
+    set_hadamard_params(params, batch_size, dim, 1, x, out, scale);
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
@@ -99,6 +106,94 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
     return out.reshape(shapes_og);
 }
 
+at::Tensor
+fast_hadamard_transform_20N(at::Tensor &x, float scale) {
+    auto input_type = x.scalar_type();
+    TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
+
+    TORCH_CHECK(x.is_cuda());
+
+    const auto shapes_og = x.sizes();
+    const int dim_og = x.size(-1);
+    x = x.reshape({-1, dim_og});
+    if (x.stride(-1) != 1) { x = x.contiguous(); }
+    const auto sizes = x.sizes();
+    const int batch_size = sizes[0];
+
+    CHECK_SHAPE(x, batch_size, dim_og);
+    TORCH_CHECK(x.stride(1) == 1);
+
+    if (dim_og % (4 * 20) != 0) {
+        x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 20) - dim_og % (4 * 20)}));
+    }
+    const int dim = x.size(1);
+
+    TORCH_CHECK(dim % (4 * 20) == 0, "fast_hadamard_transform_20N only supports hidden dimension divisible by 80 for now");
+    TORCH_CHECK(dim <= 20 * 1024, "fast_hadamard_transform_20N only supports hidden dimension at most 20480 for now");
+
+    at::Tensor out = torch::empty_like(x);
+
+    HadamardParamsBase params;
+    set_hadamard_params(params, batch_size, dim, 20, x, out, scale);
+
+    // Otherwise the kernel will be launched from cuda:0 device
+    // Cast to char to avoid compiler warning about narrowing
+    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
+        fast_hadamard_transform_20N_cuda<input_t>(params, stream);
+    });
+    if (dim_og % (4 * 20) != 0) {
+        out = out.index({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, dim_og)});
+    }
+    return out.reshape(shapes_og);
+}
+
+at::Tensor
+fast_hadamard_transform_28N(at::Tensor &x, float scale) {
+    auto input_type = x.scalar_type();
+    TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
+
+    TORCH_CHECK(x.is_cuda());
+
+    const auto shapes_og = x.sizes();
+    const int dim_og = x.size(-1);
+    x = x.reshape({-1, dim_og});
+    if (x.stride(-1) != 1) { x = x.contiguous(); }
+    const auto sizes = x.sizes();
+    const int batch_size = sizes[0];
+
+    CHECK_SHAPE(x, batch_size, dim_og);
+    TORCH_CHECK(x.stride(1) == 1);
+
+    if (dim_og % (4 * 28) != 0) {
+        x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 28) - dim_og % (4 * 28)}));
+    }
+    const int dim = x.size(1);
+
+    TORCH_CHECK(dim % (4 * 28) == 0, "fast_hadamard_transform_28N only supports hidden dimension divisible by 112 for now");
+    TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
+
+    at::Tensor out = torch::empty_like(x);
+
+    HadamardParamsBase params;
+    set_hadamard_params(params, batch_size, dim, 28, x, out, scale);
+
+    // Otherwise the kernel will be launched from cuda:0 device
+    // Cast to char to avoid compiler warning about narrowing
+    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
+        fast_hadamard_transform_28N_cuda<input_t>(params, stream);
+    });
+    if (dim_og % (8 * 28) != 0) {
+        out = out.index({torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, dim_og)});
+    }
+    return out.reshape(shapes_og);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("fast_hadamard_transform", &fast_hadamard_transform, "Fast Hadamard transform");
+    m.def("fast_hadamard_transform_20N", &fast_hadamard_transform_20N, "Fast Hadamard transform with dimension = 20 * power of 2");
+    m.def("fast_hadamard_transform_28N", &fast_hadamard_transform_28N, "Fast Hadamard transform with dimension = 28 * power of 2");
 }

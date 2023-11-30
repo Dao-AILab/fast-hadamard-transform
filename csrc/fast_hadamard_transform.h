@@ -9,7 +9,7 @@
 struct HadamardParamsBase {
     using index_t = int64_t;
 
-    int batch, dim, log_dim;
+    int batch, dim, log_N;
 
     index_t x_batch_stride;
     index_t out_batch_stride;
