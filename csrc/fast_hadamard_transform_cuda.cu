@@ -35,6 +35,29 @@ struct fast_hadamard_transform_kernel_traits {
 };
 
 template<int kNThreads_, int kLogN_, typename input_t_>
+struct fast_hadamard_transform_12N_kernel_traits {
+    using input_t = input_t_;
+    static constexpr int kNThreads = kNThreads_;
+    static constexpr int kLogN = kLogN_;
+    static constexpr int N = (1 << kLogN) * 12;
+    static_assert(N <= 12 * 1024, "fast_hadamard_transform_12 only supports dim <= 12288");
+    static constexpr int kNBytes = sizeof(input_t);
+    static_assert(kNBytes == 2 || kNBytes == 4);
+    static constexpr int kNElts = 4;
+    // It's possible that we need to do 2 rounds of exchange if input_t is 16 bits
+    // (since then we'd have 8 values of float, and each round we can exchange 4 floats).
+    static constexpr int kNExchangePerVec = sizeof(float) / sizeof(input_t);
+    using vec_t = typename BytesToType<kNBytes * kNElts>::Type;
+    static constexpr int kNChunks = N / (kNElts * kNThreads);
+    static_assert(kNChunks == 12);
+    // We don't want to use more than 24 KB of shared memory.
+    static constexpr int kSmemExchangeSize = std::min(N * 4, 24 * 1024);
+    static constexpr int kNExchangeRounds = N * 4 / kSmemExchangeSize;
+    static_assert(kNExchangeRounds * kSmemExchangeSize == N * 4);
+    static constexpr int kSmemSize = kSmemExchangeSize;
+};
+
+template<int kNThreads_, int kLogN_, typename input_t_>
 struct fast_hadamard_transform_20N_kernel_traits {
     using input_t = input_t_;
     static constexpr int kNThreads = kNThreads_;
@@ -79,6 +102,12 @@ struct fast_hadamard_transform_28N_kernel_traits {
     static_assert(kNExchangeRounds * kSmemExchangeSize == N * 4);
     static constexpr int kSmemSize = kSmemExchangeSize;
 };
+
+template <int kNChunks>
+__device__ __forceinline__ void hadamard_mult_thread_chunk_12(float x[kNChunks][12]) {
+    #pragma unroll
+    for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_12(x[c]); }
+}
 
 template <int kNChunks>
 __device__ __forceinline__ void hadamard_mult_thread_chunk_20(float x[kNChunks][20]) {
@@ -147,7 +176,9 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params) {
             #pragma unroll
             for (int i = 0; i < kNElts; ++i) { x_vals_transposed[i][c] = x_vals[c][i]; }
         }
-        if constexpr (kNChunks == 20) {
+        if constexpr (kNChunks == 12) {
+            hadamard_mult_thread_chunk_12<kNElts>(x_vals_transposed);
+        } else if constexpr (kNChunks == 20) {
             hadamard_mult_thread_chunk_20<kNElts>(x_vals_transposed);
         } else if constexpr (kNChunks == 28) {
             hadamard_mult_thread_chunk_28<kNElts>(x_vals_transposed);
@@ -208,6 +239,43 @@ void fast_hadamard_transform_cuda(HadamardParamsBase &params, cudaStream_t strea
         fast_hadamard_transform_launch<256, 14, input_t>(params, stream);
     } else if (params.log_N == 15) {
         fast_hadamard_transform_launch<256, 15, input_t>(params, stream);
+    }
+}
+
+template<int kNThreads, int kLogN, typename input_t>
+void fast_hadamard_transform_12N_launch(HadamardParamsBase &params, cudaStream_t stream) {
+    using Ktraits = fast_hadamard_transform_20N_kernel_traits<kNThreads, kLogN, input_t>;
+    constexpr int kSmemSize = Ktraits::kSmemSize;
+    dim3 grid(params.batch);
+    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
+    if (kSmemSize >= 48 * 1024) {
+        C10_CUDA_CHECK(cudaFuncSetAttribute(
+            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
+        }
+    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+template<typename input_t>
+void fast_hadamard_transform_12N_cuda(HadamardParamsBase &params, cudaStream_t stream) {
+    if (params.log_N == 2) {
+        fast_hadamard_transform_12N_launch<1, 2, input_t>(params, stream);
+    } else if (params.log_N == 2) {
+        fast_hadamard_transform_12N_launch<2, 3, input_t>(params, stream);
+    } else if (params.log_N == 4) {
+        fast_hadamard_transform_12N_launch<4, 4, input_t>(params, stream);
+    } else if (params.log_N == 5) {
+        fast_hadamard_transform_12N_launch<8, 5, input_t>(params, stream);
+    } else if (params.log_N == 6) {
+        fast_hadamard_transform_12N_launch<16, 6, input_t>(params, stream);
+    } else if (params.log_N == 7) {
+        fast_hadamard_transform_12N_launch<32, 7, input_t>(params, stream);
+    } else if (params.log_N == 8) {
+        fast_hadamard_transform_12N_launch<64, 8, input_t>(params, stream);
+    } else if (params.log_N == 9) {
+        fast_hadamard_transform_12N_launch<128, 9, input_t>(params, stream);
+    } else if (params.log_N == 10) {
+        fast_hadamard_transform_12N_launch<256, 10, input_t>(params, stream);
     }
 }
 
@@ -288,6 +356,10 @@ void fast_hadamard_transform_28N_cuda(HadamardParamsBase &params, cudaStream_t s
 template void fast_hadamard_transform_cuda<float>(HadamardParamsBase &params, cudaStream_t stream);
 template void fast_hadamard_transform_cuda<at::Half>(HadamardParamsBase &params, cudaStream_t stream);
 template void fast_hadamard_transform_cuda<at::BFloat16>(HadamardParamsBase &params, cudaStream_t stream);
+
+template void fast_hadamard_transform_12N_cuda<float>(HadamardParamsBase &params, cudaStream_t stream);
+template void fast_hadamard_transform_12N_cuda<at::Half>(HadamardParamsBase &params, cudaStream_t stream);
+template void fast_hadamard_transform_12N_cuda<at::BFloat16>(HadamardParamsBase &params, cudaStream_t stream);
 
 template void fast_hadamard_transform_20N_cuda<float>(HadamardParamsBase &params, cudaStream_t stream);
 template void fast_hadamard_transform_20N_cuda<at::Half>(HadamardParamsBase &params, cudaStream_t stream);
