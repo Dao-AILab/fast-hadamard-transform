@@ -11,7 +11,18 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct uint8 {
+    uint4 u;
+    uint4 v;
+};
+
 template<int BYTES> struct BytesToType {};
+
+template<>
+struct BytesToType<32> {
+    using Type = uint8;
+    static_assert(sizeof(Type) == 32);
+};
 
 template<> struct BytesToType<16> {
     using Type = uint4;

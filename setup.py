@@ -167,13 +167,9 @@ def get_wheel_url():
     # _, cuda_version_raw = get_cuda_bare_metal_version(CUDA_HOME)
     torch_cuda_version = parse(torch.version.cuda)
     torch_version_raw = parse(torch.__version__)
-    # Workaround for nvcc 12.1 segfaults when compiling with Pytorch 2.1
-    if (
-        torch_version_raw.major == 2
-        and torch_version_raw.minor == 1
-        and torch_cuda_version.major == 12
-    ):
-        torch_cuda_version = parse("12.2")
+    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we only compile for CUDA 12.2
+    # to save CI time. Minor versions should be compatible.
+    torch_cuda_version = parse("11.8") if torch_cuda_version.major == 11 else parse("12.2")
     python_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
     platform_name = get_platform()
     fast_hadamard_transform_version = get_package_version()
@@ -241,7 +237,7 @@ setup(
         )
     ),
     author="Tri Dao",
-    author_email="trid@cs.stanford.edu",
+    author_email="tri@tridao.me",
     description="Fast Hadamard Transform in CUDA, with a PyTorch interface",
     long_description=long_description,
     long_description_content_type="text/markdown",
