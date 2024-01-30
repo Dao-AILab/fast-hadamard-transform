@@ -29,6 +29,9 @@ template<typename input_t>
 void fast_hadamard_transform_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
 template<typename input_t>
+void fast_hadamard_transform_12N_cuda(HadamardParamsBase &params, cudaStream_t stream);
+
+template<typename input_t>
 void fast_hadamard_transform_20N_cuda(HadamardParamsBase &params, cudaStream_t stream);
 
 template<typename input_t>
