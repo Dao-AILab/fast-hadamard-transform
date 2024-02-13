@@ -58,7 +58,7 @@ jobs:
             # Pytorch >= 2.0 only supports Python >= 3.8
             - torch-version: '2.0.1'
               python-version: '3.7'
-            - torch-version: '2.1.1'
+            - torch-version: '2.1.2'
               python-version: '3.7'
             - torch-version: '2.2.0'
               python-version: '3.7'
