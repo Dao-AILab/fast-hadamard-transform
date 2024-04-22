@@ -133,8 +133,7 @@ def array_code_gen(arr):
 
 def main():
     output_dir = Path(__file__).parent / "fast_hadamard_transform_special.h"
-    # output_dir.write_text(header + array_code_gen(string_to_array(had_12_paley)) + array_code_gen(string_to_array(had_20_will)) + array_code_gen(string_to_array(had_28_will)))
-    output_dir.write_text(header + array_code_gen(string_to_array(had_12)) + array_code_gen(string_to_array(had_20_will)) + array_code_gen(string_to_array(had_28_will)))
+    output_dir.write_text(header + array_code_gen(string_to_array(had_12_paley)) + array_code_gen(string_to_array(had_20_will)) + array_code_gen(string_to_array(had_28_will)))
 
 if __name__ == '__main__':
     main()
