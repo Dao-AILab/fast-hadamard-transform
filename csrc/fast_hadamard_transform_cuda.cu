@@ -244,7 +244,7 @@ void fast_hadamard_transform_cuda(HadamardParamsBase &params, cudaStream_t strea
 
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_12N_launch(HadamardParamsBase &params, cudaStream_t stream) {
-    using Ktraits = fast_hadamard_transform_20N_kernel_traits<kNThreads, kLogN, input_t>;
+    using Ktraits = fast_hadamard_transform_12N_kernel_traits<kNThreads, kLogN, input_t>;
     constexpr int kSmemSize = Ktraits::kSmemSize;
     dim3 grid(params.batch);
     auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
