@@ -241,7 +241,7 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("fast_hadamard_transform", &fast_hadamard_transform, "Fast Hadamard transform");
-    m.def("fast_hadamard_transform_12N", &fast_hadamard_transform_20N, "Fast Hadamard transform with dimension = 12 * power of 2");
+    m.def("fast_hadamard_transform_12N", &fast_hadamard_transform_12N, "Fast Hadamard transform with dimension = 12 * power of 2");
     m.def("fast_hadamard_transform_20N", &fast_hadamard_transform_20N, "Fast Hadamard transform with dimension = 20 * power of 2");
     m.def("fast_hadamard_transform_28N", &fast_hadamard_transform_28N, "Fast Hadamard transform with dimension = 28 * power of 2");
 }
