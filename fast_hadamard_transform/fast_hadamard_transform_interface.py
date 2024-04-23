@@ -127,6 +127,32 @@ def hadamard_transform_28N(x, scale=1.0):
     return HadamardTransform28NFn.apply(x, scale)
 
 
+class HadamardTransform40NFn(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, scale=1.0):
+        ctx._hadamard_transform_scale = scale
+        return fast_hadamard_transform_cuda.fast_hadamard_transform_40N(x, scale)
+
+    @staticmethod
+    def backward(ctx, dout):
+        # The Hadamard transform matrix is symmetric, so in the backward pass we multiply by its
+        # transpose, which is itself.
+        return fast_hadamard_transform_cuda.fast_hadamard_transform_40N(dout, ctx._hadamard_transform_scale), None
+
+def hadamard_transform_40N(x, scale=1.0):
+    """
+    Arguments:
+        x: (..., dim)
+        scale: float. Multiply the output by this number.
+    Returns:
+        out: (..., dim)
+
+    Multiply each row of x by the Hadamard transform matrix, where dim = 40 * power of 2.
+    If dim is not 40 * a power of 2, we implicitly pad x with zero so that dim is 40 * the next power of 2.
+    """
+    return HadamardTransform40NFn.apply(x, scale)
+
 def hadamard_transform_ref(x, scale=1.0):
     """
     x: (..., dim)
