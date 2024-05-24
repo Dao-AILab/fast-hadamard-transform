@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "torch", "ninja", "packaging"]
+requires = ["setuptools", "torch", "ninja", "packaging", "wheel"]
 
 [tool.setuptools.packages.find]
 exclude = [
@@ -15,7 +15,7 @@ exclude = [
 
 [project]
 name = "fast_hadamard_transform"
-version = 1.0.5
+version = "1.0.5"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",
