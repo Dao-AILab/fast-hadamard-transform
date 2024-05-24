@@ -222,8 +222,6 @@ class CachedWheelsCommand(_bdist_wheel):
 
 
 setup(
-    name=PACKAGE_NAME,
-    version=get_package_version(),
     packages=find_packages(
         exclude=(
             "build",
@@ -236,27 +234,10 @@ setup(
             "fast_hadamard_transform.egg-info",
         )
     ),
-    author="Tri Dao",
-    author_email="tri@tridao.me",
-    description="Fast Hadamard Transform in CUDA, with a PyTorch interface",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/Dao-AILab/fast-hadamard-transform",
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: BSD License",
-        "Operating System :: Unix",
-    ],
     ext_modules=ext_modules,
     cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": BuildExtension}
     if ext_modules
     else {
         "bdist_wheel": CachedWheelsCommand,
     },
-    python_requires=">=3.7",
-    install_requires=[
-        "torch",
-        "packaging",
-        "ninja",
-    ],
 )
