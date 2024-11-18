@@ -82,7 +82,10 @@ def check_if_cuda_home_none(global_option: str) -> None:
 
 
 def append_nvcc_threads(nvcc_extra_args):
-    return nvcc_extra_args + ["--threads", "4"]
+    if torch.version.cuda:
+        return nvcc_extra_args + ["--threads", "4"]
+    else:
+        return nvcc_extra_args
 
 
 cmdclass = {}
@@ -93,24 +96,32 @@ if not SKIP_CUDA_BUILD:
     TORCH_MAJOR = int(torch.__version__.split(".")[0])
     TORCH_MINOR = int(torch.__version__.split(".")[1])
 
-    check_if_cuda_home_none("fast_hadamard_transform")
-    # Check, if CUDA11 is installed for compute capability 8.0
     cc_flag = []
-    if CUDA_HOME is not None:
-        _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
-        if bare_metal_version < Version("11.6"):
-            raise RuntimeError(
-                "fast_hadamard_transform is only supported on CUDA 11.6 and above.  "
-                "Note: make sure nvcc has a supported version by running nvcc -V."
-            )
+    if torch.version.cuda:
+        check_if_cuda_home_none("fast_hadamard_transform")
+        # Check, if CUDA11 is installed for compute capability 8.0
+        if CUDA_HOME is not None:
+            _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
+            if bare_metal_version < Version("11.6"):
+                raise RuntimeError(
+                    "fast_hadamard_transform is only supported on CUDA 11.6 and above.  "
+                    "Note: make sure nvcc has a supported version by running nvcc -V."
+                )
 
-    cc_flag.append("-gencode")
-    cc_flag.append("arch=compute_70,code=sm_70")
-    cc_flag.append("-gencode")
-    cc_flag.append("arch=compute_80,code=sm_80")
-    if bare_metal_version >= Version("11.8"):
         cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_90,code=sm_90")
+        cc_flag.append("arch=compute_70,code=sm_70")
+        cc_flag.append("-gencode")
+        cc_flag.append("arch=compute_80,code=sm_80")
+        if bare_metal_version >= Version("11.8"):
+            cc_flag.append("-gencode")
+            cc_flag.append("arch=compute_90,code=sm_90")
+        cc_flag.append("--expt-relaxed-constexpr")
+        cc_flag.append("--expt-extended-lambda")
+        cc_flag.append("--use_fast_math")
+        cc_flag.append("--ptxas-options=-v")
+        cc_flag.append("-lineinfo")
+    else:
+        cc_flag.append("-DUSE_ROCM=1")
 
     # HACK: The compiler flag -D_GLIBCXX_USE_CXX11_ABI is set to be the same as
     # torch._C._GLIBCXX_USE_CXX11_ABI
@@ -123,7 +134,7 @@ if not SKIP_CUDA_BUILD:
             name="fast_hadamard_transform_cuda",
             sources=[
                 "csrc/fast_hadamard_transform.cpp",
-                "csrc/fast_hadamard_transform_cuda.cu",
+                "csrc/fast_hadamard_transform_gpu.cu",
             ],
             extra_compile_args={
                 "cxx": ["-O3"],
@@ -136,11 +147,6 @@ if not SKIP_CUDA_BUILD:
                         "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
                         "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                         "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                        "--expt-relaxed-constexpr",
-                        "--expt-extended-lambda",
-                        "--use_fast_math",
-                        "--ptxas-options=-v",
-                        "-lineinfo",
                     ]
                     + cc_flag
                 ),
