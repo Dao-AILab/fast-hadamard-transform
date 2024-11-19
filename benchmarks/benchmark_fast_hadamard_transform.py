@@ -2,6 +2,7 @@ import torch
 
 from flash_attn.utils.benchmark import benchmark_forward, pytorch_profiler
 from fast_hadamard_transform import hadamard_transform
+from fast_hadamard_transform.fast_hadamard_transform_interface import hadamard_transform_12N
 from fast_hadamard_transform.fast_hadamard_transform_interface import hadamard_transform_20N
 from fast_hadamard_transform.fast_hadamard_transform_interface import hadamard_transform_28N
 

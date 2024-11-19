@@ -9,6 +9,10 @@
 
 #define FULL_MASK 0xffffffff
 
+#ifdef USE_ROCM
+#define __shfl_xor_sync(MASK, X, OFFSET) __shfl_xor(X, OFFSET)
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct uint8 {
