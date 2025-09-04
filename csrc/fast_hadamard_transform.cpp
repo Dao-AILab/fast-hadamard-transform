@@ -221,8 +221,7 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
     const int dim = x.size(1);
 
     TORCH_CHECK(dim % (4 * 28) == 0, "fast_hadamard_transform_28N only supports hidden dimension divisible by 112 for now");
-    // TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
-    TORCH_CHECK(dim <= 28 * 2048, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
+    TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
 
     at::Tensor out = torch::empty_like(x);
 
@@ -264,8 +263,8 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     }
     const int dim = x.size(1);
 
-    TORCH_CHECK(dim % (4 * 40) == 0, "fast_hadamard_transform_40N only supports hidden dimension divisible by 112 for now");
-    TORCH_CHECK(dim <= 40 * 2048, "fast_hadamard_transform_40N only supports hidden dimension at most 4096 for now");
+    TORCH_CHECK(dim % (4 * 40) == 0, "fast_hadamard_transform_40N only supports hidden dimension divisible by 160 for now");
+    TORCH_CHECK(dim <= 40 * 1024, "fast_hadamard_transform_40N only supports hidden dimension at most 40960 for now");
 
     at::Tensor out = torch::empty_like(x);
 

@@ -109,7 +109,7 @@ struct fast_hadamard_transform_40N_kernel_traits {
     static constexpr int kNThreads = kNThreads_;
     static constexpr int kLogN = kLogN_;
     static constexpr int N = (1 << kLogN) * 40;
-    static_assert(N <= 40 * 1024, "fast_hadamard_transform_40 only supports dim <= 4096");
+    static_assert(N <= 40 * 1024, "fast_hadamard_transform_40 only supports dim <= 40960");
     static constexpr int kNBytes = sizeof(input_t);
     static_assert(kNBytes == 2 || kNBytes == 4);
     static constexpr int kNElts = 4;
@@ -291,7 +291,7 @@ template<typename input_t>
 void fast_hadamard_transform_12N_cuda(HadamardParamsBase &params, cudaStream_t stream) {
     if (params.log_N == 2) {
         fast_hadamard_transform_12N_launch<1, 2, input_t>(params, stream);
-    } else if (params.log_N == 2) {
+    } else if (params.log_N == 3) {
         fast_hadamard_transform_12N_launch<2, 3, input_t>(params, stream);
     } else if (params.log_N == 4) {
         fast_hadamard_transform_12N_launch<4, 4, input_t>(params, stream);
@@ -307,7 +307,7 @@ void fast_hadamard_transform_12N_cuda(HadamardParamsBase &params, cudaStream_t s
         fast_hadamard_transform_12N_launch<128, 9, input_t>(params, stream);
     } else if (params.log_N == 10) {
         fast_hadamard_transform_12N_launch<256, 10, input_t>(params, stream);
-    }
+    } 
 }
 
 template<int kNThreads, int kLogN, typename input_t>
@@ -328,7 +328,7 @@ template<typename input_t>
 void fast_hadamard_transform_20N_cuda(HadamardParamsBase &params, cudaStream_t stream) {
     if (params.log_N == 2) {
         fast_hadamard_transform_20N_launch<1, 2, input_t>(params, stream);
-    } else if (params.log_N == 2) {
+    } else if (params.log_N == 3) {
         fast_hadamard_transform_20N_launch<2, 3, input_t>(params, stream);
     } else if (params.log_N == 4) {
         fast_hadamard_transform_20N_launch<4, 4, input_t>(params, stream);
@@ -365,7 +365,7 @@ template<typename input_t>
 void fast_hadamard_transform_28N_cuda(HadamardParamsBase &params, cudaStream_t stream) {
     if (params.log_N == 2) {
         fast_hadamard_transform_28N_launch<1, 2, input_t>(params, stream);
-    } else if (params.log_N == 2) {
+    } else if (params.log_N == 3) {
         fast_hadamard_transform_28N_launch<2, 3, input_t>(params, stream);
     } else if (params.log_N == 4) {
         fast_hadamard_transform_28N_launch<4, 4, input_t>(params, stream);
@@ -402,7 +402,7 @@ template<typename input_t>
 void fast_hadamard_transform_40N_cuda(HadamardParamsBase &params, cudaStream_t stream) {
     if (params.log_N == 2) {
         fast_hadamard_transform_40N_launch<1, 2, input_t>(params, stream);
-    } else if (params.log_N == 2) {
+    } else if (params.log_N == 3) {
         fast_hadamard_transform_40N_launch<2, 3, input_t>(params, stream);
     } else if (params.log_N == 4) {
         fast_hadamard_transform_40N_launch<4, 4, input_t>(params, stream);
