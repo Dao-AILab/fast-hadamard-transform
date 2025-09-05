@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools", "torch", "ninja", "packaging", "wheel"]
+
+[tool.setuptools.packages.find]
+exclude = [
+    "build",
+    "csrc",
+    "include",
+    "tests",
+    "dist",
+    "docs",
+    "benchmarks",
+    "fast_hadamard_transform.egg-info",
+]
+
+[project]
+name = "fast_hadamard_transform"
+version = "1.0.5"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: Unix",
+]
+authors = [
+  { name="Tri Dao", email="tri@tridao.me" },
+]
+readme = "README.md"
+description = "Fast Hadamard Transform in CUDA, with a PyTorch interface"
+requires-python = ">=3.7"
+dependencies = [
+    "torch",
+    "scipy"
+]
+
+[project.urls]
+Homepage = "https://github.com/Dao-AILab/fast-hadamard-transform"
+Issues = "https://github.com/Dao-AILab/fast-hadamard-transform/issues"
