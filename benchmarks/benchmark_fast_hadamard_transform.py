@@ -14,6 +14,8 @@ seqlen = 2048
 dim = 16384 * 2
 dtype = torch.float16
 device = "cuda"
+if hasattr(torch, "musa"):
+    device = "musa"
 
 torch.random.manual_seed(0)
 x = torch.randn(batch_size, seqlen, dim, dtype=dtype, device=device)

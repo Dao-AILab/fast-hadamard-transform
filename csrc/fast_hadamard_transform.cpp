@@ -2,11 +2,17 @@
  * Copyright (c) 2023, Tri Dao.
  ******************************************************************************/
 
+#ifndef USE_MUSA
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
+#else
+#include "torch_musa/csrc/aten/musa/MUSAContext.h"
+#include "torch_musa/csrc/core/MUSAGuard.h"
+#endif
 #include <torch/extension.h>
 #include <vector>
 
+#include "vendor.h"
 #include "fast_hadamard_transform.h"
 
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
@@ -74,7 +80,11 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
     auto input_type = x.scalar_type();
     TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
 
+#ifndef USE_MUSA
     TORCH_CHECK(x.is_cuda());
+#else
+    TORCH_CHECK(x.is_privateuseone());
+#endif
 
     const auto shapes_og = x.sizes();
     const int dim_og = x.size(-1);
@@ -117,7 +127,11 @@ fast_hadamard_transform_12N(at::Tensor &x, float scale) {
     auto input_type = x.scalar_type();
     TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
 
+#ifndef USE_MUSA
     TORCH_CHECK(x.is_cuda());
+#else
+    TORCH_CHECK(x.is_privateuseone());
+#endif
 
     const auto shapes_og = x.sizes();
     const int dim_og = x.size(-1);
@@ -160,7 +174,11 @@ fast_hadamard_transform_20N(at::Tensor &x, float scale) {
     auto input_type = x.scalar_type();
     TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
 
+#ifndef USE_MUSA
     TORCH_CHECK(x.is_cuda());
+#else
+    TORCH_CHECK(x.is_privateuseone());
+#endif
 
     const auto shapes_og = x.sizes();
     const int dim_og = x.size(-1);
@@ -203,7 +221,11 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
     auto input_type = x.scalar_type();
     TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
 
+#ifndef USE_MUSA
     TORCH_CHECK(x.is_cuda());
+#else
+    TORCH_CHECK(x.is_privateuseone());
+#endif
 
     const auto shapes_og = x.sizes();
     const int dim_og = x.size(-1);
@@ -246,7 +268,11 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     auto input_type = x.scalar_type();
     TORCH_CHECK(input_type == at::ScalarType::Float || input_type == at::ScalarType::Half || input_type == at::ScalarType::BFloat16);
 
+#ifndef USE_MUSA
     TORCH_CHECK(x.is_cuda());
+#else
+    TORCH_CHECK(x.is_privateuseone());
+#endif
 
     const auto shapes_og = x.sizes();
     const int dim_og = x.size(-1);

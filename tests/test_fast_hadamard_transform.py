@@ -16,6 +16,8 @@ from fast_hadamard_transform.fast_hadamard_transform_interface import hadamard_t
 # @pytest.mark.parametrize("dim", [256])
 def test_fast_hadamard_transform(dim, dtype):
     device = "cuda"
+    if hasattr(torch, "musa"):
+        device = "musa"
     rtol, atol = (3e-4, 3e-3) if dtype == torch.float32 else (3e-3, 5e-3)
     if dtype == torch.bfloat16:
         rtol, atol = 1e-2, 5e-2
