@@ -4,6 +4,14 @@ Features:
 - Support fp32, fp16, bf16, for dimension up to 32768.
 - Implicitly pad with zeros if dimension is not a power of 2.
 
+
+## Installation
+```
+git clone https://github.com/Dao-AILab/fast-hadamard-transform.git fast-hadamard-transform
+cd fast-hadamard-transform
+pip install -v .
+```
+
 ## How to use
 
 ```
