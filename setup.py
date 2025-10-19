@@ -81,9 +81,8 @@ def check_if_cuda_home_none(global_option: str) -> None:
     )
 
 
-def append_nvcc_threads(nvcc_extra_args):
-    return nvcc_extra_args + ["--threads", "4"]
-
+def append_nvcc_threads():
+    return ["--threads", os.getenv("NVCC_THREADS") or "4"]
 
 cmdclass = {}
 ext_modules = []
@@ -132,7 +131,7 @@ if not SKIP_CUDA_BUILD:
             ],
             extra_compile_args={
                 "cxx": ["-O3"],
-                "nvcc": append_nvcc_threads(
+                "nvcc":
                     [
                         "-O3",
                         "-U__CUDA_NO_HALF_OPERATORS__",
@@ -147,8 +146,8 @@ if not SKIP_CUDA_BUILD:
                         "--ptxas-options=-v",
                         "-lineinfo",
                     ]
-                    + cc_flag
-                ),
+                    + append_nvcc_threads()
+                    + cc_flag,
             },
             include_dirs=[this_dir],
         )
