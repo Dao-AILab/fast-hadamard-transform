@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <cuda_bf16.h>
-#include <cuda_fp16.h>
+#include "vendor.h"
 
 #define FULL_MASK 0xffffffff
 

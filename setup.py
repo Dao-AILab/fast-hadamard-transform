@@ -1,27 +1,54 @@
 # Copyright (c) 2023, Tri Dao.
-import sys
-import warnings
-import os
-import re
 import ast
-from pathlib import Path
-from packaging.version import parse, Version
+import os
 import platform
-
-from setuptools import setup, find_packages
+import re
 import subprocess
-
-import urllib.request
+import sys
 import urllib.error
-from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+import urllib.request
+import warnings
+from enum import Enum, auto
+from pathlib import Path
 
 import torch
-from torch.utils.cpp_extension import (
-    BuildExtension,
-    CppExtension,
-    CUDAExtension,
-    CUDA_HOME,
-)
+from packaging.version import Version, parse
+from setuptools import find_packages, setup
+from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+
+class Backend(Enum):
+    CUDA = auto()
+    HIP = auto()
+    MUSA = auto()
+
+
+backend = Backend.CUDA
+
+if hasattr(torch, "cuda") and (
+    torch.version.cuda is not None or torch.version.hip is not None
+):
+    from torch.utils.cpp_extension import CUDA_HOME, BuildExtension, CUDAExtension
+
+    if torch.version.hip:
+        backend = Backend.HIP
+
+
+elif hasattr(torch, "musa"):
+    import torch_musa
+    from torch_musa.utils.musa_extension import MUSA_HOME as CUDA_HOME
+    from torch_musa.utils.musa_extension import BuildExtension as MUSABuildExtension
+    from torch_musa.utils.musa_extension import MUSAExtension as CUDAExtension
+
+    class _CustomBuildExtension(MUSABuildExtension):
+        def build_extensions(self):
+            self.compiler.src_extensions += [".cu", ".cuh"]
+
+            super().build_extensions()
+
+    BuildExtension = _CustomBuildExtension
+
+    backend = Backend.MUSA
 
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -38,9 +65,13 @@ BASE_WHEEL_URL = "https://github.com/Dao-AILab/fast-hadamard-transform/releases/
 # FORCE_BUILD: Force a fresh build locally, instead of attempting to find prebuilt wheels
 # SKIP_CUDA_BUILD: Intended to allow CI to use a simple `python setup.py sdist` run to copy over raw files, without any cuda compilation
 FORCE_BUILD = os.getenv("FAST_HADAMARD_TRANSFORM_FORCE_BUILD", "FALSE") == "TRUE"
-SKIP_CUDA_BUILD = os.getenv("FAST_HADAMARD_TRANSFORM_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
+SKIP_CUDA_BUILD = (
+    os.getenv("FAST_HADAMARD_TRANSFORM_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
+)
 # For CI, we want the option to build with C++11 ABI since the nvcr images use C++11 ABI
-FORCE_CXX11_ABI = os.getenv("FAST_HADAMARD_TRANSFORM_FORCE_CXX11_ABI", "FALSE") == "TRUE"
+FORCE_CXX11_ABI = (
+    os.getenv("FAST_HADAMARD_TRANSFORM_FORCE_CXX11_ABI", "FALSE") == "TRUE"
+)
 
 
 def get_platform():
@@ -82,7 +113,11 @@ def check_if_cuda_home_none(global_option: str) -> None:
 
 
 def append_nvcc_threads():
-    return ["--threads", os.getenv("NVCC_THREADS") or "4"]
+    if backend == Backend.CUDA:
+        return ["--threads", os.getenv("NVCC_THREADS") or "4"]
+    else:
+        return []
+
 
 cmdclass = {}
 ext_modules = []
@@ -92,29 +127,34 @@ if not SKIP_CUDA_BUILD:
     TORCH_MAJOR = int(torch.__version__.split(".")[0])
     TORCH_MINOR = int(torch.__version__.split(".")[1])
 
-    check_if_cuda_home_none("fast_hadamard_transform")
-    # Check, if CUDA11 is installed for compute capability 8.0
     cc_flag = []
-    if CUDA_HOME is not None:
-        _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
-        if bare_metal_version < Version("11.6"):
-            raise RuntimeError(
-                "fast_hadamard_transform is only supported on CUDA 11.6 and above.  "
-                "Note: make sure nvcc has a supported version by running nvcc -V."
-            )
+    if backend == Backend.CUDA:
+        check_if_cuda_home_none("fast_hadamard_transform")
+        # Check, if CUDA11 is installed for compute capability 8.0
+        if CUDA_HOME is not None:
+            _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
+            if bare_metal_version < Version("11.6"):
+                raise RuntimeError(
+                    "fast_hadamard_transform is only supported on CUDA 11.6 and above.  "
+                    "Note: make sure nvcc has a supported version by running nvcc -V."
+                )
 
-    if bare_metal_version <= Version("12.9"):
+    if backend == Backend.CUDA:
+        if bare_metal_version <= Version("12.9"):
+            cc_flag.append("-gencode")
+            cc_flag.append("arch=compute_70,code=sm_70")
         cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_70,code=sm_70")
-    cc_flag.append("-gencode")
-    cc_flag.append("arch=compute_80,code=sm_80")
-    if bare_metal_version >= Version("11.8"):
-        cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_90,code=sm_90")
-    if bare_metal_version >= Version("12.8"):
-        cc_flag.append("-gencode")
-        cc_flag.append("arch=compute_100,code=sm_100")
-
+        cc_flag.append("arch=compute_80,code=sm_80")
+        if bare_metal_version >= Version("11.8"):
+            cc_flag.append("-gencode")
+            cc_flag.append("arch=compute_90,code=sm_90")
+        if bare_metal_version >= Version("12.8"):
+            cc_flag.append("-gencode")
+            cc_flag.append("arch=compute_100,code=sm_100")
+    elif backend == Backend.HIP:
+        cc_flag.append("-DUSE_ROCM=1")
+    elif backend == Backend.MUSA:
+        cc_flag.append("-DUSE_MUSA=1")
 
     # HACK: The compiler flag -D_GLIBCXX_USE_CXX11_ABI is set to be the same as
     # torch._C._GLIBCXX_USE_CXX11_ABI
@@ -122,32 +162,52 @@ if not SKIP_CUDA_BUILD:
     if FORCE_CXX11_ABI:
         torch._C._GLIBCXX_USE_CXX11_ABI = True
 
+    cxx_flags = ["-O3"] if backend in (Backend.CUDA, Backend.HIP) else ["force_mcc"]
+    backend_cc = "nvcc" if backend in (Backend.CUDA, Backend.HIP) else "mcc"
+    backend_cc_flags = []
+    if backend == Backend.CUDA or backend == Backend.HIP:
+        backend_cc_flags = [
+            "-O3",
+            "-U__CUDA_NO_HALF_OPERATORS__",
+            "-U__CUDA_NO_HALF_CONVERSIONS__",
+            "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+            "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+        ]
+        if backend == Backend.CUDA:
+            backend_cc_flags += [
+                "--expt-relaxed-constexpr",
+                "--expt-extended-lambda",
+                "--use_fast_math",
+                "--ptxas-options=-v",
+                "-lineinfo",
+            ]
+    elif backend == Backend.MUSA:
+        backend_cc_flags = [
+            "-O3",
+            "-fPIC",
+            "-std=c++17",
+            "-x",
+            "musa",
+            "-mtgpu",
+            "--cuda-gpu-arch=mp_31",
+            "-fno-strict-aliasing",
+            "-ffast-math",
+            "-Od3",
+            "-fmusa-flush-denormals-to-zero",
+        ]
+
     ext_modules.append(
         CUDAExtension(
             name="fast_hadamard_transform_cuda",
             sources=[
                 "csrc/fast_hadamard_transform.cpp",
-                "csrc/fast_hadamard_transform_cuda.cu",
+                "csrc/fast_hadamard_transform_gpu.cu",
             ],
             extra_compile_args={
-                "cxx": ["-O3"],
-                "nvcc":
-                    [
-                        "-O3",
-                        "-U__CUDA_NO_HALF_OPERATORS__",
-                        "-U__CUDA_NO_HALF_CONVERSIONS__",
-                        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                        "--expt-relaxed-constexpr",
-                        "--expt-extended-lambda",
-                        "--use_fast_math",
-                        "--ptxas-options=-v",
-                        "-lineinfo",
-                    ]
-                    + append_nvcc_threads()
-                    + cc_flag,
+                "cxx": cxx_flags,
+                backend_cc: backend_cc_flags + append_nvcc_threads() + cc_flag,
             },
             include_dirs=[this_dir],
         )
@@ -169,11 +229,18 @@ def get_wheel_url():
     # Determine the version numbers that will be used to determine the correct wheel
     # We're using the CUDA version used to build torch, not the one currently installed
     # _, cuda_version_raw = get_cuda_bare_metal_version(CUDA_HOME)
-    torch_cuda_version = parse(torch.version.cuda)
+    backend_versions = {
+        Backend.CUDA: torch.version.cuda,
+        Backend.HIP: torch.version.hip,
+        Backend.MUSA: getattr(torch.version, "musa", None),
+    }
+    torch_cuda_version = parse(backend_versions[backend])
     torch_version_raw = parse(torch.__version__)
     # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we only compile for CUDA 12.2
     # to save CI time. Minor versions should be compatible.
-    torch_cuda_version = parse("11.8") if torch_cuda_version.major == 11 else parse("12.2")
+    torch_cuda_version = (
+        parse("11.8") if torch_cuda_version.major == 11 else parse("12.2")
+    )
     python_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
     platform_name = get_platform()
     fast_hadamard_transform_version = get_package_version()
@@ -252,11 +319,13 @@ setup(
         "Operating System :: Unix",
     ],
     ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": BuildExtension}
-    if ext_modules
-    else {
-        "bdist_wheel": CachedWheelsCommand,
-    },
+    cmdclass=(
+        {"bdist_wheel": CachedWheelsCommand, "build_ext": BuildExtension}
+        if ext_modules
+        else {
+            "bdist_wheel": CachedWheelsCommand,
+        }
+    ),
     python_requires=">=3.7",
     install_requires=[
         "torch",
