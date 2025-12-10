@@ -111,5 +111,29 @@ jobs:
       - name: Upload Built Wheels as Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: built-wheels-${{ matrix.python-version }}
+          name: built-wheels-python${{ matrix.python-version }}-torch${{ matrix.torch-version }}-cuda${{ matrix.cuda-version }}
           path: ./dist
+
+
+  consolidate-wheels:
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Consolidate wheels into a single folder
+        run: |
+          mkdir -p consolidated_wheels
+          find dist -name '*.whl' -exec cp {} consolidated_wheels/ \;
+          ls -l consolidated_wheels
+
+      - name: Upload consolidated wheels artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-wheels
+          path: consolidated_wheels
+
+
