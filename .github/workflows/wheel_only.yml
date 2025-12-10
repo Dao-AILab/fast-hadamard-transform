@@ -35,12 +35,21 @@ jobs:
           echo "MATRIX_TORCH_VERSION=$(echo ${{ matrix.torch-version }} | awk -F \. {'print $1 "." $2'})" >> $GITHUB_ENV
           echo "MATRIX_PYTHON_VERSION=$(echo ${{ matrix.python-version }} | awk -F \. {'print $1 $2'})" >> $GITHUB_ENV
 
-      - name: Free up disk space
-        if: ${{ runner.os == 'Linux' }}
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+        
+          # all of these default to true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
 
       - name: Set up swap space
         if: runner.os == 'Linux'
@@ -56,6 +65,11 @@ jobs:
           cuda: ${{ matrix.cuda-version }}
           linux-local-args: '["--toolkit"]'
           method: 'network'
+
+      - name: Clean APT cache
+        run: |
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
 
       - name: Install PyTorch ${{ matrix.torch-version }}+cu${{ matrix.cuda-version }}
         run: |
