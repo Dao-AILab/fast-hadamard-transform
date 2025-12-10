@@ -13,24 +13,12 @@ jobs:
       matrix:
           os: [ubuntu-22.04]
           python-version: ['3.9', '3.10', '3.11', '3.12']
-          torch-version: ['2.7.0']
-          cuda-version: ['12.6.0']
+          torch-version: ['2.7.0', '2.8.0', '2.9.0']
+          cuda-version: ['12.6.0', '12.8.0']
           cxx11_abi: ['FALSE']
           exclude:
-            - torch-version: '1.12.1'
-              python-version: '3.11'
-            - torch-version: '2.0.1'
-              python-version: '3.7'
-            - torch-version: '2.1.2'
-              python-version: '3.7'
-            - torch-version: '2.2.0'
-              python-version: '3.7'
-            - torch-version: '1.12.1'
-              cuda-version: '12.2.0'
-            - torch-version: '1.13.1'
-              cuda-version: '12.2.0'
-            - torch-version: '2.0.1'
-              cuda-version: '12.2.0'
+            - torch-version: '2.9.0'
+              python-version: '3.9'
 
     steps:
       - name: Checkout
@@ -75,8 +63,8 @@ jobs:
           pip install lit
           export TORCH_CUDA_VERSION=$(python -c "
           import os
-          minv = {'1.12': 113, '1.13': 116, '2.0': 117, '2.1': 118, '2.2': 118, '2.4': 118, '2.5': 118, '2.7': 118}
-          maxv = {'1.12': 116, '1.13': 117, '2.0': 118, '2.1': 121, '2.2': 121, '2.4': 124, '2.5': 124, '2.7': 128}
+          minv = {'2.7': 118, '2.8': 126, '2.9': 126}
+          maxv = {'2.7': 128, '2.8': 129, '2.9': 130}
           torch_version = os.environ['MATRIX_TORCH_VERSION']
           cuda_version = int(os.environ['MATRIX_CUDA_VERSION'])
           result = max(min(cuda_version, maxv[torch_version]), minv[torch_version])
