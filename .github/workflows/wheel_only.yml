@@ -99,9 +99,7 @@ jobs:
           export PATH=/usr/local/nvidia/bin:/usr/local/nvidia/lib64:$PATH
           export LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
           MAX_JOBS=2 FAST_HADAMARD_TRANSFORM_FORCE_BUILD="TRUE" FAST_HADAMARD_TRANSFORM_FORCE_CXX11_ABI=${{ matrix.cxx11_abi}} python setup.py bdist_wheel --dist-dir=dist
-          tmpname=cu${MATRIX_CUDA_VERSION}torch${MATRIX_TORCH_VERSION}cxx11abi${{ matrix.cxx11_abi }}
-          wheel_name=$(ls dist/*whl | xargs -n 1 basename | sed "s/-/+$tmpname-/2")
-          ls dist/*whl |xargs -I {} mv {} dist/${wheel_name}
+          wheel_name=$(ls dist/*whl | xargs -n 1 basename)
           echo "wheel_name=${wheel_name}" >> $GITHUB_ENV
 
       - name: Log Built Wheels
