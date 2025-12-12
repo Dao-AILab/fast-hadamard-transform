@@ -221,6 +221,13 @@ class CachedWheelsCommand(_bdist_wheel):
             super().run()
 
 
+_torch_version = parse(torch.__version__)
+_torch_major = _torch_version.major
+_torch_minor = _torch_version.minor
+_torch_lower = f"{_torch_major}.{_torch_minor}"
+_torch_upper = f"{_torch_major}.{_torch_minor + 1}"
+
+
 setup(
     name=PACKAGE_NAME,
     version=get_package_version(),
@@ -254,8 +261,9 @@ setup(
         "bdist_wheel": CachedWheelsCommand,
     },
     python_requires=">=3.7",
+    # We build one wheel per torch version, so the version is pinned here
     install_requires=[
-        "torch",
+        f"torch>={_torch_lower},<{_torch_upper}",
         "packaging",
         "ninja",
     ],
