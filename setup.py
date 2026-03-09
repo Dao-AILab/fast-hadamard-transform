@@ -103,9 +103,17 @@ if not SKIP_CUDA_BUILD:
                 "Note: make sure nvcc has a supported version by running nvcc -V."
             )
 
-    for i in range(torch.cuda.device_count()):
-        major, minor = torch.cuda.get_device_capability(i)
-        cc_flag.extend(["-gencode", f"arch=compute_{major}{minor},code=sm_{major}{minor}"])
+    if torch.cuda.is_available():
+        caps = {torch.cuda.get_device_capability(i) for i in range(torch.cuda.device_count())}
+        for m, n in caps:
+            cc_flag.append("-gencode")
+            cc_flag.append(f"arch=compute_{m}{n},code=sm_{m}{n}")
+        m, n = max(caps)
+        cc_flag.append("-gencode")
+        cc_flag.append(f"arch=compute_{m}{n},code=compute_{m}{n}")
+    else:
+        cc_flag.append("-gencode")
+        cc_flag.append("arch=compute_80,code=compute_80")
 
 
     # HACK: The compiler flag -D_GLIBCXX_USE_CXX11_ABI is set to be the same as
