@@ -105,7 +105,11 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
-    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+    c10::DeviceGuard device_guard(x.device());
+#else
+    at::cuda::CUDAGuard device_guard{x.device()};
+#endif
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
         fast_hadamard_transform_cuda<input_t>(params, stream);
@@ -148,7 +152,11 @@ fast_hadamard_transform_12N(at::Tensor &x, float scale) {
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
-    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+    c10::DeviceGuard device_guard(x.device());
+#else
+    at::cuda::CUDAGuard device_guard{x.device()};
+#endif
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
         fast_hadamard_transform_12N_cuda<input_t>(params, stream);
@@ -191,7 +199,11 @@ fast_hadamard_transform_20N(at::Tensor &x, float scale) {
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
-    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+    c10::DeviceGuard device_guard(x.device());
+#else
+    at::cuda::CUDAGuard device_guard{x.device()};
+#endif
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
         fast_hadamard_transform_20N_cuda<input_t>(params, stream);
@@ -234,7 +246,11 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
-    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+    c10::DeviceGuard device_guard(x.device());
+#else
+    at::cuda::CUDAGuard device_guard{x.device()};
+#endif
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
         fast_hadamard_transform_28N_cuda<input_t>(params, stream);
@@ -277,7 +293,11 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
 
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
-    at::cuda::CUDAGuard device_guard{(char)x.get_device()};
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+    c10::DeviceGuard device_guard(x.device());
+#else
+    at::cuda::CUDAGuard device_guard{x.device()};
+#endif
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(x.scalar_type(), "fast_hadamard_transform", [&] {
         fast_hadamard_transform_40N_cuda<input_t>(params, stream);
