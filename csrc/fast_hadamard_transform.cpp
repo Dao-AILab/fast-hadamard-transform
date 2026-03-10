@@ -2,9 +2,13 @@
  * Copyright (c) 2023, Tri Dao.
  ******************************************************************************/
 
-#include <ATen/cuda/CUDAContext.h>
-#include <c10/cuda/CUDAGuard.h>
 #include <torch/extension.h>
+#if TORCH_VERSION_MAJOR > 2 || (TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR >= 6)
+#include <c10/core/DeviceGuard.h>
+#else
+#include <c10/cuda/CUDAGuard.h>
+#endif
+#include <c10/cuda/CUDAStream.h>
 #include <vector>
 
 #include "fast_hadamard_transform.h"
