@@ -48,7 +48,7 @@ def get_platform():
     Returns the platform name as used in wheel filenames.
     """
     if sys.platform.startswith("linux"):
-        return "linux_x86_64"
+        return f"linux_{platform.machine()}"
     elif sys.platform == "darwin":
         mac_version = ".".join(platform.mac_ver()[0].split(".")[:2])
         return f"macosx_{mac_version}_x86_64"
@@ -181,14 +181,10 @@ def get_wheel_url():
     # _, cuda_version_raw = get_cuda_bare_metal_version(CUDA_HOME)
     torch_cuda_version = parse(torch.version.cuda)
     torch_version_raw = parse(torch.__version__)
-    # For CUDA 11, we only compile for CUDA 11.8, and for CUDA 12 we only compile for CUDA 12.2
-    # to save CI time. Minor versions should be compatible.
-    torch_cuda_version = parse("11.8") if torch_cuda_version.major == 11 else parse("12.2")
     python_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
     platform_name = get_platform()
     fast_hadamard_transform_version = get_package_version()
-    # cuda_version = f"{cuda_version_raw.major}{cuda_version_raw.minor}"
-    cuda_version = f"{torch_cuda_version.major}{torch_cuda_version.minor}"
+    cuda_version = str(torch_cuda_version.major)
     torch_version = f"{torch_version_raw.major}.{torch_version_raw.minor}"
     cxx11_abi = str(torch._C._GLIBCXX_USE_CXX11_ABI).upper()
 

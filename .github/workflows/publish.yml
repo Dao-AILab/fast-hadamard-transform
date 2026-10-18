@@ -8,7 +8,7 @@
 name: Build wheels and deploy
 
 on:
-  create:
+  push:
     tags:
       - v*
 
@@ -43,7 +43,7 @@ jobs:
           # manylinux docker image, but I haven't figured out how to install CUDA on manylinux.
           os: [ubuntu-22.04, ubuntu-22.04-arm]
           python-version: ['3.10', '3.11', '3.12', '3.13']
-          torch-version: ['2.6.0', '2.7.1', '2.8.0', '2.9.1', '2.10.0']
+          torch-version: ['2.6.0', '2.7.1', '2.8.0', '2.9.1', '2.10.0', '2.11.0']
           cuda-version: ['11.8.0', '12.9.1', '13.0.1']
           # We need separate wheels that either uses C++11 ABI (-D_GLIBCXX_USE_CXX11_ABI) or not.
           # Pytorch wheels currently don't use it, but nvcr images have Pytorch compiled with C++11 ABI.
@@ -57,6 +57,8 @@ jobs:
             - torch-version: '2.9.1'
               cuda-version: '11.8.0'
             - torch-version: '2.10.0'
+              cuda-version: '11.8.0'
+            - torch-version: '2.11.0'
               cuda-version: '11.8.0'
             # CUDA 13.0 is only supported by PyTorch 2.9+
             - torch-version: '2.6.0'
@@ -79,6 +81,8 @@ jobs:
             - torch-version: '2.9.1'
               cxx11_abi: 'FALSE'
             - torch-version: '2.10.0'
+              cxx11_abi: 'FALSE'
+            - torch-version: '2.11.0'
               cxx11_abi: 'FALSE'
 
     steps:
@@ -137,6 +141,7 @@ jobs:
               '2.8': [126, 128, 129], \
               '2.9': [126, 128, 130], \
               '2.10': [126, 128, 130], \
+              '2.11': [126, 128, 129, 130], \
             }[env['MATRIX_TORCH_VERSION']]; \
             sys_cuda = int(env['MATRIX_CUDA_VERSION']); \
             print(max(v for v in available if v <= sys_cuda))" \
@@ -154,12 +159,57 @@ jobs:
           pip install ninja packaging wheel
           export PATH=/usr/local/nvidia/bin:/usr/local/nvidia/lib64:$PATH
           export LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+          df -h / /usr/local/cuda "$RUNNER_TEMP"
+          free -h
           # Limit MAX_JOBS otherwise the github runner goes OOM
-          MAX_JOBS=2 FAST_HADAMARD_TRANSFORM_FORCE_BUILD="TRUE" FAST_HADAMARD_TRANSFORM_FORCE_CXX11_ABI=${{ matrix.cxx11_abi}} python setup.py bdist_wheel --dist-dir=dist
+          set +e
+          timeout 5h env \
+            MAX_JOBS=2 \
+            FAST_HADAMARD_TRANSFORM_FORCE_BUILD="TRUE" \
+            FAST_HADAMARD_TRANSFORM_FORCE_CXX11_ABI="${{ matrix.cxx11_abi }}" \
+            python setup.py bdist_wheel --dist-dir=dist 2>&1 | tee build.log
+          build_status=${PIPESTATUS[0]}
+          set -e
+          df -h / /usr/local/cuda "$RUNNER_TEMP"
+          free -h
+          if [[ $build_status -eq 124 ]]; then
+            echo "::error::Wheel build timed out after 5 hours"
+          elif grep -Eqi 'No space left on device|Disk quota exceeded' build.log; then
+            echo "::error::Wheel build failed because disk space was exhausted"
+          elif [[ $build_status -eq 137 ]] || grep -Eqi 'Out of memory|Cannot allocate memory|Killed process|fatal error: Killed signal terminated program' build.log; then
+            echo "::error::Wheel build was killed, likely because the runner ran out of memory"
+          fi
+          if [[ $build_status -ne 0 ]]; then
+            exit "$build_status"
+          fi
+          mapfile -t wheel_paths < <(find dist -maxdepth 1 -type f -name '*.whl' -print)
+          if [[ ${#wheel_paths[@]} -ne 1 ]]; then
+            echo "Expected one built wheel, found ${#wheel_paths[@]}" >&2
+            exit 1
+          fi
+          built_wheel=${wheel_paths[0]}
           tmpname=cu${WHEEL_CUDA_VERSION}torch${MATRIX_TORCH_VERSION}cxx11abi${{ matrix.cxx11_abi }}
-          wheel_name=$(ls dist/*whl | xargs -n 1 basename | sed "s/-/+$tmpname-/2")
-          ls dist/*whl |xargs -I {} mv {} dist/${wheel_name}
-          echo "wheel_name=${wheel_name}" >> $GITHUB_ENV
+          wheel_name=$(basename "$built_wheel" | sed "s/-/+$tmpname-/2")
+          mv "$built_wheel" "dist/$wheel_name"
+          echo "wheel_name=$wheel_name" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Verify wheel import without CUDA driver
+        run: |
+          pip install --no-cache-dir --no-deps "dist/$wheel_name"
+          cuda_stub_dir=$(mktemp -d)
+          cuda_stub=/usr/local/cuda/lib64/stubs/libcuda.so
+          if [[ ! -f "$cuda_stub" ]]; then
+            echo "::error::CUDA driver stub not found at $cuda_stub"
+            exit 1
+          fi
+          ln -s "$cuda_stub" "$cuda_stub_dir/libcuda.so.1"
+          (
+            cd /tmp || exit 1
+            CUDA_VISIBLE_DEVICES="" LD_LIBRARY_PATH="$cuda_stub_dir:${LD_LIBRARY_PATH:-}" python -c \
+              "import fast_hadamard_transform; print('fast_hadamard_transform import OK')"
+          )
+        shell: bash
 
       - name: Log Built Wheels
         run: |
