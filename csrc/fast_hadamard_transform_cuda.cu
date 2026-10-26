@@ -7,6 +7,7 @@
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
 #include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
+#include <cstdint>
 
 #include "fast_hadamard_transform.h"
 #include "fast_hadamard_transform_common.h"
@@ -150,7 +151,7 @@ __device__ __forceinline__ void hadamard_mult_thread_chunk_40(float x[kNChunks][
     for (int c = 0; c < kNChunks; ++c) { hadamard_mult_thread_40(x[c]); }
 }
 
-template<typename Ktraits>
+template<typename Ktraits, bool kIsAligned>
 __global__ __launch_bounds__(Ktraits::kNThreads)
 void fast_hadamard_transform_kernel(HadamardParamsBase params) {
     constexpr int kNThreads = Ktraits::kNThreads;
@@ -187,7 +188,7 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params) {
     input_t *out = reinterpret_cast<input_t *>(params.out_ptr) + batch_id * params.out_batch_stride;
 
     float x_vals[kNChunks][kNElts];
-    load_input<kNChunks, kNElts, input_t>(x, x_vals, params.dim);
+    load_input<kNChunks, kNElts, input_t, kIsAligned>(x, x_vals, params.dim);
 
     hadamard_mult_thread<kLogNElts, kNChunks>(x_vals);
     hadamard_mult_warp<kLogWarpSize, 0, kNChunks, kNElts>(x_vals);
@@ -228,18 +229,28 @@ void fast_hadamard_transform_kernel(HadamardParamsBase params) {
     store_output<kNChunks, kNElts, input_t>(out, x_vals, params.dim, params.scale);
 }
 
+template<typename Ktraits>
+void launch_hadamard_transform(HadamardParamsBase &params, cudaStream_t stream) {
+    constexpr int kSmemSize = Ktraits::kSmemSize;
+    constexpr int kAlignment = alignof(typename Ktraits::vec_t);
+    const bool is_aligned = reinterpret_cast<std::uintptr_t>(params.x_ptr) % kAlignment == 0 &&
+        (params.batch <= 1 || params.x_batch_stride % Ktraits::kNElts == 0);
+    dim3 grid(params.batch);
+    BOOL_SWITCH(is_aligned, kIsAligned, [&] {
+        auto kernel = &fast_hadamard_transform_kernel<Ktraits, kIsAligned>;
+        if (kSmemSize >= 48 * 1024) {
+            C10_CUDA_CHECK(cudaFuncSetAttribute(
+                kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
+        }
+        kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    });
+}
+
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_launch(HadamardParamsBase &params, cudaStream_t stream) {
     using Ktraits = fast_hadamard_transform_kernel_traits<kNThreads, kLogN, input_t>;
-    constexpr int kSmemSize = Ktraits::kSmemSize;
-    dim3 grid(params.batch);
-    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
-    if (kSmemSize >= 48 * 1024) {
-        C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-        }
-    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    launch_hadamard_transform<Ktraits>(params, stream);
 }
 
 template<typename input_t>
@@ -276,15 +287,7 @@ void fast_hadamard_transform_cuda(HadamardParamsBase &params, cudaStream_t strea
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_12N_launch(HadamardParamsBase &params, cudaStream_t stream) {
     using Ktraits = fast_hadamard_transform_12N_kernel_traits<kNThreads, kLogN, input_t>;
-    constexpr int kSmemSize = Ktraits::kSmemSize;
-    dim3 grid(params.batch);
-    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
-    if (kSmemSize >= 48 * 1024) {
-        C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-        }
-    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    launch_hadamard_transform<Ktraits>(params, stream);
 }
 
 template<typename input_t>
@@ -313,15 +316,7 @@ void fast_hadamard_transform_12N_cuda(HadamardParamsBase &params, cudaStream_t s
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_20N_launch(HadamardParamsBase &params, cudaStream_t stream) {
     using Ktraits = fast_hadamard_transform_20N_kernel_traits<kNThreads, kLogN, input_t>;
-    constexpr int kSmemSize = Ktraits::kSmemSize;
-    dim3 grid(params.batch);
-    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
-    if (kSmemSize >= 48 * 1024) {
-        C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-        }
-    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    launch_hadamard_transform<Ktraits>(params, stream);
 }
 
 template<typename input_t>
@@ -350,15 +345,7 @@ void fast_hadamard_transform_20N_cuda(HadamardParamsBase &params, cudaStream_t s
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_28N_launch(HadamardParamsBase &params, cudaStream_t stream) {
     using Ktraits = fast_hadamard_transform_28N_kernel_traits<kNThreads, kLogN, input_t>;
-    constexpr int kSmemSize = Ktraits::kSmemSize;
-    dim3 grid(params.batch);
-    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
-    if (kSmemSize >= 48 * 1024) {
-        C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-        }
-    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    launch_hadamard_transform<Ktraits>(params, stream);
 }
 
 template<typename input_t>
@@ -387,15 +374,7 @@ void fast_hadamard_transform_28N_cuda(HadamardParamsBase &params, cudaStream_t s
 template<int kNThreads, int kLogN, typename input_t>
 void fast_hadamard_transform_40N_launch(HadamardParamsBase &params, cudaStream_t stream) {
     using Ktraits = fast_hadamard_transform_40N_kernel_traits<kNThreads, kLogN, input_t>;
-    constexpr int kSmemSize = Ktraits::kSmemSize;
-    dim3 grid(params.batch);
-    auto kernel = &fast_hadamard_transform_kernel<Ktraits>;
-    if (kSmemSize >= 48 * 1024) {
-        C10_CUDA_CHECK(cudaFuncSetAttribute(
-            kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
-        }
-    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    launch_hadamard_transform<Ktraits>(params, stream);
 }
 
 template<typename input_t>

@@ -125,9 +125,20 @@ __device__ __forceinline__ void hadamard_mult_warp(float x[kNChunks][kNItems]) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <int kNChunks, int kNElts, typename input_t>
+template <int kNChunks, int kNElts, typename input_t, bool kIsAligned>
 inline __device__ void load_input(input_t *x, float x_vals[kNChunks][kNElts], int dim) {
     using vec_t = typename BytesToType<sizeof(input_t) * kNElts>::Type;
+    if constexpr (!kIsAligned) {
+        #pragma unroll
+        for (int c = 0; c < kNChunks; ++c) {
+            const int offset = (c * blockDim.x + threadIdx.x) * kNElts;
+            #pragma unroll
+            for (int i = 0; i < kNElts; ++i) {
+                x_vals[c][i] = offset < dim ? float(x[offset + i]) : 0.f;
+            }
+        }
+        return;
+    }
     input_t x_vals_load[kNChunks][kNElts] = {0};
     #pragma unroll
     for (int c = 0; c < kNChunks; ++c) {
