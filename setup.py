@@ -5,6 +5,7 @@ import os
 import re
 import ast
 from pathlib import Path
+import shutil
 from packaging.version import parse, Version
 import platform
 
@@ -228,7 +229,7 @@ class CachedWheelsCommand(_bdist_wheel):
 
             wheel_path = os.path.join(self.dist_dir, archive_basename + ".whl")
             print("Raw wheel path", wheel_path)
-            os.rename(wheel_filename, wheel_path)
+            shutil.move(wheel_filename, wheel_path)
         except urllib.error.HTTPError:
             print("Precompiled wheel not found. Building from source...")
             # If the wheel could not be downloaded, build from source
