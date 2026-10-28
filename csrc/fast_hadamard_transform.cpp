@@ -88,7 +88,7 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
     const int batch_size = sizes[0];
 
     CHECK_SHAPE(x, batch_size, dim_og);
-    TORCH_CHECK(x.stride(1) == 1);
+    TORCH_CHECK(batch_size == 0 || x.stride(1) == 1);
 
     if (dim_og % 8 != 0) {
         x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, 8 - dim_og % 8}));
@@ -99,6 +99,7 @@ fast_hadamard_transform(at::Tensor &x, float scale) {
     TORCH_CHECK(dim <= 32768, "fast_hadamard_transform only supports hidden dimension at most 32768 for now");
 
     at::Tensor out = torch::empty_like(x);
+    if (batch_size == 0) { return out.reshape(shapes_og); }
 
     HadamardParamsBase params;
     set_hadamard_params(params, batch_size, dim, 1, x, out, scale);
@@ -135,7 +136,7 @@ fast_hadamard_transform_12N(at::Tensor &x, float scale) {
     const int batch_size = sizes[0];
 
     CHECK_SHAPE(x, batch_size, dim_og);
-    TORCH_CHECK(x.stride(1) == 1);
+    TORCH_CHECK(batch_size == 0 || x.stride(1) == 1);
 
     if (dim_og % (4 * 12) != 0) {
         x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 12) - dim_og % (4 * 12)}));
@@ -146,6 +147,7 @@ fast_hadamard_transform_12N(at::Tensor &x, float scale) {
     TORCH_CHECK(dim <= 12 * 1024, "fast_hadamard_transform_12N only supports hidden dimension at most 12288 for now");
 
     at::Tensor out = torch::empty_like(x);
+    if (batch_size == 0) { return out.reshape(shapes_og); }
 
     HadamardParamsBase params;
     set_hadamard_params(params, batch_size, dim, 12, x, out, scale);
@@ -182,7 +184,7 @@ fast_hadamard_transform_20N(at::Tensor &x, float scale) {
     const int batch_size = sizes[0];
 
     CHECK_SHAPE(x, batch_size, dim_og);
-    TORCH_CHECK(x.stride(1) == 1);
+    TORCH_CHECK(batch_size == 0 || x.stride(1) == 1);
 
     if (dim_og % (4 * 20) != 0) {
         x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 20) - dim_og % (4 * 20)}));
@@ -193,6 +195,7 @@ fast_hadamard_transform_20N(at::Tensor &x, float scale) {
     TORCH_CHECK(dim <= 20 * 1024, "fast_hadamard_transform_20N only supports hidden dimension at most 20480 for now");
 
     at::Tensor out = torch::empty_like(x);
+    if (batch_size == 0) { return out.reshape(shapes_og); }
 
     HadamardParamsBase params;
     set_hadamard_params(params, batch_size, dim, 20, x, out, scale);
@@ -229,7 +232,7 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
     const int batch_size = sizes[0];
 
     CHECK_SHAPE(x, batch_size, dim_og);
-    TORCH_CHECK(x.stride(1) == 1);
+    TORCH_CHECK(batch_size == 0 || x.stride(1) == 1);
 
     if (dim_og % (4 * 28) != 0) {
         x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 28) - dim_og % (4 * 28)}));
@@ -240,6 +243,7 @@ fast_hadamard_transform_28N(at::Tensor &x, float scale) {
     TORCH_CHECK(dim <= 28 * 1024, "fast_hadamard_transform_28N only supports hidden dimension at most 28672 for now");
 
     at::Tensor out = torch::empty_like(x);
+    if (batch_size == 0) { return out.reshape(shapes_og); }
 
     HadamardParamsBase params;
     set_hadamard_params(params, batch_size, dim, 28, x, out, scale);
@@ -276,7 +280,7 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     const int batch_size = sizes[0];
 
     CHECK_SHAPE(x, batch_size, dim_og);
-    TORCH_CHECK(x.stride(1) == 1);
+    TORCH_CHECK(batch_size == 0 || x.stride(1) == 1);
 
     if (dim_og % (4 * 40) != 0) {
         x = torch::nn::functional::pad(x, torch::nn::functional::PadFuncOptions({0, (4 * 40) - dim_og % (4 * 40)}));
@@ -287,6 +291,7 @@ fast_hadamard_transform_40N(at::Tensor &x, float scale) {
     TORCH_CHECK(dim <= 40 * 1024, "fast_hadamard_transform_40N only supports hidden dimension at most 40960 for now");
 
     at::Tensor out = torch::empty_like(x);
+    if (batch_size == 0) { return out.reshape(shapes_og); }
 
     HadamardParamsBase params;
     set_hadamard_params(params, batch_size, dim, 40, x, out, scale);
