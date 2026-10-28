@@ -1,0 +1,28 @@
+name: Test source package
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  source-package:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install pytest setuptools==68.0.0 wheel packaging
+      - name: Verify the source archive contains the CUDA build sources
+        env:
+          FAST_HADAMARD_TRANSFORM_SKIP_CUDA_BUILD: "TRUE"
+        run: python -m pytest -q tests/test_source_distribution.py
