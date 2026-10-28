@@ -157,7 +157,7 @@ if not SKIP_CUDA_BUILD:
                         "-lineinfo",
                     ]
                     + append_nvcc_threads()
-                    + cc_flag,
+                    + ([] if os.environ.get("TORCH_CUDA_ARCH_LIST") else cc_flag),
             },
             include_dirs=[this_dir],
         )

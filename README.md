@@ -12,6 +12,15 @@ cd fast-hadamard-transform
 pip install -v .
 ```
 
+For a local build, set `TORCH_CUDA_ARCH_LIST` to compile only for the GPUs you need.
+For example, an A100 build can use:
+
+```sh
+TORCH_CUDA_ARCH_LIST="8.0" FAST_HADAMARD_TRANSFORM_FORCE_BUILD=TRUE pip install -v .
+```
+
+Without this variable, source builds retain the full release architecture list.
+
 ## How to use
 
 ```
